@@ -1,0 +1,32 @@
+{
+  "name": "level-up-heroes",
+  "version": "1.0.0",
+  "private": true,
+  "engines": {
+    "node": ">=20 <25"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "lucide-react": "^0.468.0",
+    "next": "^15.5.23",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@rushstack/eslint-patch": "^1.16.1",
+    "@types/node": "^22.10.2",
+    "@types/react": "^19.0.3",
+    "@types/react-dom": "^19.0.2",
+    "caniuse-lite": "^1.0.30001809",
+    "es-abstract": "^1.24.2",
+    "eslint": "^9.17.0",
+    "eslint-config-next": "^15.5.23",
+    "esquery": "^1.7.0",
+    "typescript": "^5.7.2"
+  }
+}
