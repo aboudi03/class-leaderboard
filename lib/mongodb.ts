@@ -16,17 +16,31 @@ const cache = globalWithMongoose.mongooseCache ?? {
 
 globalWithMongoose.mongooseCache = cache;
 
+function normalizeMongoUri(value: string) {
+  const configuredLine = value
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .find((line) => line.includes("mongodb+srv://") || line.includes("mongodb://"));
+
+  let uri = configuredLine ?? value.trim();
+  const protocolIndex = uri.indexOf("mongodb");
+  if (protocolIndex > 0) uri = uri.slice(protocolIndex);
+  return uri.trim().replace(/^['"]|['"]$/g, "");
+}
+
 export async function connectToDatabase() {
   if (cache.connection) {
     console.info(`[MongoDB] Using existing connection to database: ${cache.connection.connection.name}`);
     return cache.connection;
   }
 
-  const uri = process.env.MONGODB_URI;
-  if (!uri) {
+  const configuredUri = process.env.MONGODB_URI;
+  if (!configuredUri) {
     console.error("[MongoDB] Connection failed: MONGODB_URI is not configured.");
     throw new Error("MONGODB_URI is not set. Add it to .env.local before starting the app.");
   }
+
+  const uri = normalizeMongoUri(configuredUri);
 
   const databaseName = process.env.MONGODB_DB_NAME || "class-leaderboard";
 
