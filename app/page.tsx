@@ -17,8 +17,6 @@ type SortBy = "name" | "points" | "level" | "progress";
 type PointModal = { student: Student; type: "positive" | "negative" } | null;
 type Celebration = { student: string; from: string; to: string; final: boolean } | null;
 
-const STORAGE_KEY = "level-up-heroes-data-v2";
-const LEGACY_STORAGE_KEY = "level-up-heroes-data-v1";
 const CLASS_KEY = "level-up-heroes-class-v1";
 
 const navItems: Array<{ id: View; label: string; icon: typeof Home }> = [
@@ -61,19 +59,21 @@ export default function HomePage() {
   const [toast, setToast] = useState<{ student: string; points: number } | null>(null);
 
   useEffect(() => {
-    try {
-      localStorage.removeItem(LEGACY_STORAGE_KEY);
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) setData(JSON.parse(saved));
-      const savedClass = localStorage.getItem(CLASS_KEY);
-      if (savedClass && CLASSES.some((item) => item.id === savedClass)) setClassId(savedClass);
-    } catch { /* keep seed data */ }
-    setHydrated(true);
-  }, []);
+    const savedClass = localStorage.getItem(CLASS_KEY);
+    if (savedClass && CLASSES.some((item) => item.id === savedClass)) setClassId(savedClass);
 
-  useEffect(() => {
-    if (hydrated) localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-  }, [data, hydrated]);
+    fetch("/api/data")
+      .then(async (response) => {
+        if (!response.ok) throw new Error((await response.json()).error ?? "Unable to load data.");
+        return response.json() as Promise<AppData>;
+      })
+      .then(setData)
+      .catch((error) => {
+        console.error(error);
+        window.alert("Could not load the leaderboard from MongoDB. Check MONGODB_URI and your Atlas network access.");
+      })
+      .finally(() => setHydrated(true));
+  }, []);
 
   useEffect(() => {
     if (hydrated) localStorage.setItem(CLASS_KEY, classId);
@@ -103,39 +103,54 @@ export default function HomePage() {
     setSidebarOpen(false);
   }
 
-  function addPoints(student: Student, points: number, reason: string) {
+  async function addPoints(student: Student, points: number, reason: string) {
     const beforeIndex = levelIndex(student.points);
-    const newPoints = Math.max(0, student.points + points);
-    const actualPoints = newPoints - student.points;
-    const afterIndex = levelIndex(newPoints);
-    const now = new Date();
-    const transaction: PointTransaction = {
-      id: crypto.randomUUID(), studentId: student.id, points: actualPoints,
-      type: points > 0 ? "positive" : "negative", reason,
-      date: now.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }),
-      time: now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }), createdAt: now.toISOString(),
-    };
-    setData((current) => ({
-      students: current.students.map((item) => item.id === student.id ? { ...item, points: newPoints } : item),
-      transactions: [transaction, ...current.transactions],
-    }));
-    setPointModal(null);
-    setToast({ student: student.name, points: actualPoints });
-    window.setTimeout(() => setToast(null), 1800);
-    if (afterIndex > beforeIndex) {
-      const levels = LEVELS[theme];
-      setCelebration({ student: student.name, from: levels[beforeIndex].name, to: levels[afterIndex].name, final: afterIndex === 6 });
+    try {
+      const response = await fetch("/api/transactions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ studentId: student.id, points, reason }),
+      });
+      if (!response.ok) throw new Error((await response.json()).error ?? "Unable to save points.");
+      const result = await response.json() as { student: Student; transaction: PointTransaction };
+      const afterIndex = levelIndex(result.student.points);
+      setData((current) => ({
+        students: current.students.map((item) => item.id === result.student.id ? result.student : item),
+        transactions: [result.transaction, ...current.transactions],
+      }));
+      setPointModal(null);
+      setToast({ student: result.student.name, points: result.transaction.points });
+      window.setTimeout(() => setToast(null), 1800);
+      if (afterIndex > beforeIndex) {
+        const levels = LEVELS[theme];
+        setCelebration({ student: result.student.name, from: levels[beforeIndex].name, to: levels[afterIndex].name, final: afterIndex === 6 });
+      }
+    } catch (error) {
+      console.error(error);
+      window.alert(error instanceof Error ? error.message : "Unable to save points.");
     }
   }
 
-  function saveStudent(name: string, photo: string | null, existing?: Student) {
-    setData((current) => ({
-      ...current,
-      students: existing
-        ? current.students.map((item) => item.id === existing.id ? { ...item, name, photo } : item)
-        : [...current.students, { id: crypto.randomUUID(), classId, name, photo, points: 0, createdAt: new Date().toISOString() }],
-    }));
-    setStudentModal(null);
+  async function saveStudent(name: string, photo: string | null, existing?: Student) {
+    try {
+      const response = await fetch(existing ? `/api/students/${existing.id}` : "/api/students", {
+        method: existing ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(existing ? { name, photo } : { classId, name, photo }),
+      });
+      if (!response.ok) throw new Error((await response.json()).error ?? "Unable to save student.");
+      const saved = await response.json() as Student;
+      setData((current) => ({
+        ...current,
+        students: existing
+          ? current.students.map((item) => item.id === saved.id ? saved : item)
+          : [...current.students, saved],
+      }));
+      setStudentModal(null);
+    } catch (error) {
+      console.error(error);
+      window.alert(error instanceof Error ? error.message : "Unable to save student.");
+    }
   }
 
   const pageTitle = navItems.find((item) => item.id === view)?.label ?? "Dashboard";
@@ -292,12 +307,12 @@ function HistoryModal({ student, transactions, theme, onClose }: { student: Stud
   return <div className="modal-layer" onMouseDown={(event) => event.target === event.currentTarget && onClose()}><section className="modal history-modal" role="dialog" aria-modal="true" aria-label={`${student.name} activity history`}><button className="modal-close" onClick={onClose}><X /></button><div className="history-header"><Avatar student={student} theme={theme} large /><div><span className="eyebrow">ACTIVITY HISTORY</span><h2>{student.name}</h2><p>{student.points} points · {getLevel(student.points, theme).name}</p></div></div><div className="history-list">{items.map((item) => <div key={item.id}><span className={item.points >= 0 ? "positive" : "negative"}>{item.points > 0 ? "+" : ""}{item.points}</span><div><strong>{item.reason}</strong><small>{item.type === "positive" ? "Positive behavior" : "Behavior reminder"}</small></div><time>{item.date}<small>{item.time}</small></time></div>)}{!items.length && <div className="empty-history"><History /><strong>No activity yet</strong><span>The next point change will appear here.</span></div>}</div></section></div>;
 }
 
-function StudentModal({ mode, student, theme, onClose, onSave }: { mode: "add" | "edit"; student?: Student; theme: ThemeId; onClose: () => void; onSave: (name: string, photo: string | null, student?: Student) => void }) {
+function StudentModal({ mode, student, theme, onClose, onSave }: { mode: "add" | "edit"; student?: Student; theme: ThemeId; onClose: () => void; onSave: (name: string, photo: string | null, student?: Student) => void | Promise<void> }) {
   const [name, setName] = useState(student?.name ?? "");
   const [photo, setPhoto] = useState<string | null>(student?.photo ?? null);
   function readPhoto(event: ChangeEvent<HTMLInputElement>) { const file = event.target.files?.[0]; if (!file) return; const reader = new FileReader(); reader.onload = () => setPhoto(String(reader.result)); reader.readAsDataURL(file); }
   const preview: Student = student ?? { id: "preview", classId: "", name: name || "New Hero", photo, points: 0, createdAt: "" };
-  return <div className="modal-layer" onMouseDown={(event) => event.target === event.currentTarget && onClose()}><form className="modal student-modal" onSubmit={(event) => { event.preventDefault(); if (name.trim()) onSave(name.trim(), photo, student); }}><button className="modal-close" type="button" onClick={onClose}><X /></button><span className="eyebrow">{mode === "add" ? "WELCOME A NEW HERO" : "STUDENT PROFILE"}</span><h2>{mode === "add" ? "Add student" : `Edit ${student?.name}`}</h2><div className="photo-editor"><Avatar student={{ ...preview, name: name || preview.name, photo }} theme={theme} large /><div><label className="upload-button"><Camera size={16} /> {photo ? "Replace photo" : "Upload photo"}<input type="file" accept="image/*" onChange={readPhoto} /></label>{photo && <button type="button" onClick={() => setPhoto(null)}><Trash2 size={15} /> Remove photo</button>}<small>JPG, PNG or WebP. Stored on this device.</small></div></div><label className="field-label">Student name<input autoFocus value={name} onChange={(event) => setName(event.target.value)} placeholder="Enter full name" required /></label><div className="modal-actions"><button type="button" className="outline-button" onClick={onClose}>Cancel</button><button className="primary-button" type="submit"><UserPlus size={16} /> {mode === "add" ? "Add student" : "Save changes"}</button></div></form></div>;
+  return <div className="modal-layer" onMouseDown={(event) => event.target === event.currentTarget && onClose()}><form className="modal student-modal" onSubmit={(event) => { event.preventDefault(); if (name.trim()) void onSave(name.trim(), photo, student); }}><button className="modal-close" type="button" onClick={onClose}><X /></button><span className="eyebrow">{mode === "add" ? "WELCOME A NEW HERO" : "STUDENT PROFILE"}</span><h2>{mode === "add" ? "Add student" : `Edit ${student?.name}`}</h2><div className="photo-editor"><Avatar student={{ ...preview, name: name || preview.name, photo }} theme={theme} large /><div><label className="upload-button"><Camera size={16} /> {photo ? "Replace photo" : "Upload photo"}<input type="file" accept="image/*" onChange={readPhoto} /></label>{photo && <button type="button" onClick={() => setPhoto(null)}><Trash2 size={15} /> Remove photo</button>}<small>JPG, PNG or WebP. Stored in MongoDB.</small></div></div><label className="field-label">Student name<input autoFocus value={name} onChange={(event) => setName(event.target.value)} placeholder="Enter full name" required /></label><div className="modal-actions"><button type="button" className="outline-button" onClick={onClose}>Cancel</button><button className="primary-button" type="submit"><UserPlus size={16} /> {mode === "add" ? "Add student" : "Save changes"}</button></div></form></div>;
 }
 
 function Celebration({ data, theme, onClose }: { data: NonNullable<Celebration>; theme: ThemeId; onClose: () => void }) {
