@@ -21,3 +21,15 @@ export function getMongoErrorCode(error: unknown): MongoErrorCode {
 
   return "MONGODB_ERROR";
 }
+
+export function getMongoErrorType(error: unknown) {
+  const details = error as { code?: unknown; name?: unknown };
+
+  return {
+    type: typeof details.name === "string" ? details.name : "UnknownError",
+    databaseCode:
+      typeof details.code === "number" || typeof details.code === "string"
+        ? details.code
+        : null,
+  };
+}
