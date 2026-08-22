@@ -153,6 +153,28 @@ export default function HomePage() {
     }
   }
 
+  async function deleteStudent(student: Student) {
+    const confirmed = window.confirm(
+      `Delete ${student.name} and all of their point history? This cannot be undone.`,
+    );
+    if (!confirmed) return;
+
+    try {
+      const response = await fetch(`/api/students/${student.id}`, { method: "DELETE" });
+      if (!response.ok) throw new Error((await response.json()).error ?? "Unable to delete student.");
+
+      setData((current) => ({
+        students: current.students.filter((item) => item.id !== student.id),
+        transactions: current.transactions.filter((item) => item.studentId !== student.id),
+      }));
+      setStudentModal(null);
+      setHistoryStudent((current) => current?.id === student.id ? null : current);
+    } catch (error) {
+      console.error(error);
+      window.alert(error instanceof Error ? error.message : "Unable to delete student.");
+    }
+  }
+
   const pageTitle = navItems.find((item) => item.id === view)?.label ?? "Dashboard";
 
   return (
@@ -210,7 +232,7 @@ export default function HomePage() {
 
       {pointModal && <PointPicker modal={pointModal} theme={theme} onClose={() => setPointModal(null)} onChoose={(points, reason) => addPoints(pointModal.student, points, reason)} />}
       {historyStudent && <HistoryModal student={data.students.find((item) => item.id === historyStudent.id) ?? historyStudent} transactions={data.transactions} theme={theme} onClose={() => setHistoryStudent(null)} />}
-      {studentModal && <StudentModal mode={studentModal.mode} student={studentModal.student} theme={theme} onClose={() => setStudentModal(null)} onSave={saveStudent} />}
+      {studentModal && <StudentModal mode={studentModal.mode} student={studentModal.student} theme={theme} onClose={() => setStudentModal(null)} onSave={saveStudent} onDelete={deleteStudent} />}
       {celebration && <Celebration data={celebration} theme={theme} onClose={() => setCelebration(null)} />}
       {toast && <div className={`point-toast ${toast.points < 0 ? "negative" : ""}`}><span>{toast.points > 0 ? theme === "neon" ? "⚡" : "✨" : "−"}</span><strong>{toast.points > 0 ? "+" : ""}{toast.points} POINTS</strong><small>{toast.student}</small></div>}
     </main>
@@ -307,12 +329,12 @@ function HistoryModal({ student, transactions, theme, onClose }: { student: Stud
   return <div className="modal-layer" onMouseDown={(event) => event.target === event.currentTarget && onClose()}><section className="modal history-modal" role="dialog" aria-modal="true" aria-label={`${student.name} activity history`}><button className="modal-close" onClick={onClose}><X /></button><div className="history-header"><Avatar student={student} theme={theme} large /><div><span className="eyebrow">ACTIVITY HISTORY</span><h2>{student.name}</h2><p>{student.points} points · {getLevel(student.points, theme).name}</p></div></div><div className="history-list">{items.map((item) => <div key={item.id}><span className={item.points >= 0 ? "positive" : "negative"}>{item.points > 0 ? "+" : ""}{item.points}</span><div><strong>{item.reason}</strong><small>{item.type === "positive" ? "Positive behavior" : "Behavior reminder"}</small></div><time>{item.date}<small>{item.time}</small></time></div>)}{!items.length && <div className="empty-history"><History /><strong>No activity yet</strong><span>The next point change will appear here.</span></div>}</div></section></div>;
 }
 
-function StudentModal({ mode, student, theme, onClose, onSave }: { mode: "add" | "edit"; student?: Student; theme: ThemeId; onClose: () => void; onSave: (name: string, photo: string | null, student?: Student) => void | Promise<void> }) {
+function StudentModal({ mode, student, theme, onClose, onSave, onDelete }: { mode: "add" | "edit"; student?: Student; theme: ThemeId; onClose: () => void; onSave: (name: string, photo: string | null, student?: Student) => void | Promise<void>; onDelete: (student: Student) => void | Promise<void> }) {
   const [name, setName] = useState(student?.name ?? "");
   const [photo, setPhoto] = useState<string | null>(student?.photo ?? null);
   function readPhoto(event: ChangeEvent<HTMLInputElement>) { const file = event.target.files?.[0]; if (!file) return; const reader = new FileReader(); reader.onload = () => setPhoto(String(reader.result)); reader.readAsDataURL(file); }
   const preview: Student = student ?? { id: "preview", classId: "", name: name || "New Hero", photo, points: 0, createdAt: "" };
-  return <div className="modal-layer" onMouseDown={(event) => event.target === event.currentTarget && onClose()}><form className="modal student-modal" onSubmit={(event) => { event.preventDefault(); if (name.trim()) void onSave(name.trim(), photo, student); }}><button className="modal-close" type="button" onClick={onClose}><X /></button><span className="eyebrow">{mode === "add" ? "WELCOME A NEW HERO" : "STUDENT PROFILE"}</span><h2>{mode === "add" ? "Add student" : `Edit ${student?.name}`}</h2><div className="photo-editor"><Avatar student={{ ...preview, name: name || preview.name, photo }} theme={theme} large /><div><label className="upload-button"><Camera size={16} /> {photo ? "Replace photo" : "Upload photo"}<input type="file" accept="image/*" onChange={readPhoto} /></label>{photo && <button type="button" onClick={() => setPhoto(null)}><Trash2 size={15} /> Remove photo</button>}<small>JPG, PNG or WebP. Stored in MongoDB.</small></div></div><label className="field-label">Student name<input autoFocus value={name} onChange={(event) => setName(event.target.value)} placeholder="Enter full name" required /></label><div className="modal-actions"><button type="button" className="outline-button" onClick={onClose}>Cancel</button><button className="primary-button" type="submit"><UserPlus size={16} /> {mode === "add" ? "Add student" : "Save changes"}</button></div></form></div>;
+  return <div className="modal-layer" onMouseDown={(event) => event.target === event.currentTarget && onClose()}><form className="modal student-modal" onSubmit={(event) => { event.preventDefault(); if (name.trim()) void onSave(name.trim(), photo, student); }}><button className="modal-close" type="button" onClick={onClose}><X /></button><span className="eyebrow">{mode === "add" ? "WELCOME A NEW HERO" : "STUDENT PROFILE"}</span><h2>{mode === "add" ? "Add student" : `Edit ${student?.name}`}</h2><div className="photo-editor"><Avatar student={{ ...preview, name: name || preview.name, photo }} theme={theme} large /><div><label className="upload-button"><Camera size={16} /> {photo ? "Replace photo" : "Upload photo"}<input type="file" accept="image/*" onChange={readPhoto} /></label>{photo && <button type="button" onClick={() => setPhoto(null)}><Trash2 size={15} /> Remove photo</button>}<small>JPG, PNG or WebP. Stored in MongoDB.</small></div></div><label className="field-label">Student name<input autoFocus value={name} onChange={(event) => setName(event.target.value)} placeholder="Enter full name" required /></label><div className="modal-actions">{mode === "edit" && student && <button type="button" className="danger-button" onClick={() => void onDelete(student)}><Trash2 size={16} /> Delete student</button>}<button type="button" className="outline-button" onClick={onClose}>Cancel</button><button className="primary-button" type="submit"><UserPlus size={16} /> {mode === "add" ? "Add student" : "Save changes"}</button></div></form></div>;
 }
 
 function Celebration({ data, theme, onClose }: { data: NonNullable<Celebration>; theme: ThemeId; onClose: () => void }) {
