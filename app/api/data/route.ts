@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
+import { getMongoErrorCode } from "@/lib/mongo-error";
 import { serializeStudent, serializeTransaction } from "@/lib/serializers";
 import { PointTransactionModel } from "@/models/PointTransaction";
 import { StudentModel } from "@/models/Student";
@@ -18,6 +19,9 @@ export async function GET() {
     });
   } catch (error) {
     console.error("Failed to load leaderboard data", error);
-    return NextResponse.json({ error: "Unable to load leaderboard data." }, { status: 500 });
+    return NextResponse.json(
+      { error: "Unable to load leaderboard data.", code: getMongoErrorCode(error) },
+      { status: 500 },
+    );
   }
 }
