@@ -58,8 +58,8 @@ export const LEVELS = {
   ],
 } as const;
 
-export const POINT_AWARD = 5;
-export const POINT_DEDUCTION = -3;
+export const POINT_AWARD = 10;
+export const POINT_DEDUCTION = -5;
 
 export const POSITIVE_REASONS = [
   { reason: "Active participation", points: POINT_AWARD, icon: "Hand" },
