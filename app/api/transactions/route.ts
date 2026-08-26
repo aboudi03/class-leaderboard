@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
+import { POINT_AWARD, POINT_DEDUCTION } from "@/lib/game";
 import { serializeStudent, serializeTransaction } from "@/lib/serializers";
 import { PointTransactionModel } from "@/models/PointTransaction";
 import { StudentModel, type StudentDocument } from "@/models/Student";
@@ -15,6 +16,7 @@ export async function POST(request: Request) {
     if (!studentId || !reason || !Number.isInteger(requestedPoints) || requestedPoints === 0) {
       return NextResponse.json({ error: "Student, reason, and non-zero whole points are required." }, { status: 400 });
     }
+    const points = requestedPoints > 0 ? POINT_AWARD : POINT_DEDUCTION;
 
     await connectToDatabase();
     const session = await mongoose.startSession();
@@ -26,7 +28,7 @@ export async function POST(request: Request) {
         const student = await StudentModel.findById(studentId).session(session);
         if (!student) throw new Error("STUDENT_NOT_FOUND");
 
-        const newPoints = Math.max(0, student.points + requestedPoints);
+        const newPoints = Math.max(0, student.points + points);
         const actualPoints = newPoints - student.points;
         student.points = newPoints;
         await student.save({ session });
@@ -35,7 +37,7 @@ export async function POST(request: Request) {
           _id: crypto.randomUUID(),
           studentId,
           points: actualPoints,
-          type: requestedPoints > 0 ? "positive" : "negative",
+          type: points > 0 ? "positive" : "negative",
           reason,
           occurredAt: new Date(),
         }], { session });

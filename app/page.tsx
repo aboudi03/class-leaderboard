@@ -1,7 +1,7 @@
 "use client";
 
 import {
-  Award, BarChart3, Bell, BookOpen, Camera, ChevronDown, Crown, Download, Gauge,
+  Award, BarChart3, Bell, BookOpen, Camera, ChevronDown, Crown, Dice5, Download, Gauge,
   Gem, Heart, History, Home, Menu, Minus, MoreHorizontal, Plus,
   Search, Settings, ShieldCheck, Sparkles, Star, Target, Trash2, TrendingUp,
   Trophy, UserPlus, Users, WandSparkles, X, Zap,
@@ -55,6 +55,7 @@ export default function HomePage() {
   const [pointModal, setPointModal] = useState<PointModal>(null);
   const [historyStudent, setHistoryStudent] = useState<Student | null>(null);
   const [studentModal, setStudentModal] = useState<{ mode: "add" | "edit"; student?: Student } | null>(null);
+  const [randomStudent, setRandomStudent] = useState<Student | null>(null);
   const [celebration, setCelebration] = useState<Celebration>(null);
   const [toast, setToast] = useState<{ student: string; points: number } | null>(null);
 
@@ -101,6 +102,16 @@ export default function HomePage() {
     setClassId(id);
     setSearch("");
     setSidebarOpen(false);
+    setRandomStudent(null);
+  }
+
+  function pickRandomStudent() {
+    if (!classStudents.length) return;
+
+    const choices = classStudents.length > 1 && randomStudent
+      ? classStudents.filter((student) => student.id !== randomStudent.id)
+      : classStudents;
+    setRandomStudent(choices[Math.floor(Math.random() * choices.length)]);
   }
 
   async function addPoints(student: Student, points: number, reason: string) {
@@ -221,9 +232,9 @@ export default function HomePage() {
           champions={champions} average={average} topStudents={topStudents} search={search} setSearch={setSearch}
           sortBy={sortBy} setSortBy={setSortBy} onPoint={(student, type) => setPointModal({ student, type })}
           onHistory={setHistoryStudent} onEdit={(student) => setStudentModal({ mode: "edit", student })}
-          onAdd={() => setStudentModal({ mode: "add" })} currentClass={currentClass.name}
+          onAdd={() => setStudentModal({ mode: "add" })} onRandom={pickRandomStudent} currentClass={currentClass.name}
         />}
-        {view === "classes" && <ClassesView students={visibleStudents} theme={theme} search={search} setSearch={setSearch} sortBy={sortBy} setSortBy={setSortBy} onPoint={(student, type) => setPointModal({ student, type })} onHistory={setHistoryStudent} onEdit={(student) => setStudentModal({ mode: "edit", student })} onAdd={() => setStudentModal({ mode: "add" })} />}
+        {view === "classes" && <ClassesView students={visibleStudents} hasStudents={classStudents.length > 0} theme={theme} search={search} setSearch={setSearch} sortBy={sortBy} setSortBy={setSortBy} onPoint={(student, type) => setPointModal({ student, type })} onHistory={setHistoryStudent} onEdit={(student) => setStudentModal({ mode: "edit", student })} onAdd={() => setStudentModal({ mode: "add" })} onRandom={pickRandomStudent} />}
         {view === "levels" && <LevelsView theme={theme} students={classStudents} />}
         {view === "tools" && <ToolsView students={classStudents} theme={theme} onPoint={(student) => setPointModal({ student, type: "positive" })} />}
         {view === "reports" && <ReportsView students={classStudents} transactions={data.transactions} theme={theme} total={totalPoints} average={average} champions={champions} />}
@@ -233,6 +244,7 @@ export default function HomePage() {
       {pointModal && <PointPicker modal={pointModal} theme={theme} onClose={() => setPointModal(null)} onChoose={(points, reason) => addPoints(pointModal.student, points, reason)} />}
       {historyStudent && <HistoryModal student={data.students.find((item) => item.id === historyStudent.id) ?? historyStudent} transactions={data.transactions} theme={theme} onClose={() => setHistoryStudent(null)} />}
       {studentModal && <StudentModal mode={studentModal.mode} student={studentModal.student} theme={theme} onClose={() => setStudentModal(null)} onSave={saveStudent} onDelete={deleteStudent} />}
+      {randomStudent && <RandomStudentModal student={randomStudent} theme={theme} className={currentClass.name} onPickAgain={pickRandomStudent} onClose={() => setRandomStudent(null)} />}
       {celebration && <Celebration data={celebration} theme={theme} onClose={() => setCelebration(null)} />}
       {toast && <div className={`point-toast ${toast.points < 0 ? "negative" : ""}`}><span>{toast.points > 0 ? theme === "neon" ? "⚡" : "✨" : "−"}</span><strong>{toast.points > 0 ? "+" : ""}{toast.points} POINTS</strong><small>{toast.student}</small></div>}
     </main>
@@ -246,7 +258,7 @@ function ClassSelector({ classId, onSelect, theme }: { classId: string; onSelect
 function Dashboard(props: {
   students: Student[]; allStudents: Student[]; theme: ThemeId; totalPoints: number; champions: number; average: number; topStudents: Student[];
   search: string; setSearch: (value: string) => void; sortBy: SortBy; setSortBy: (value: SortBy) => void;
-  onPoint: (student: Student, type: "positive" | "negative") => void; onHistory: (student: Student) => void; onEdit: (student: Student) => void; onAdd: () => void; currentClass: string;
+  onPoint: (student: Student, type: "positive" | "negative") => void; onHistory: (student: Student) => void; onEdit: (student: Student) => void; onAdd: () => void; onRandom: () => void; currentClass: string;
 }) {
   return <>
     <section className="stats-grid">
@@ -258,7 +270,7 @@ function Dashboard(props: {
     <Journey theme={props.theme} students={props.allStudents} />
     <section className="dashboard-columns">
       <div className="roster-panel panel">
-        <div className="panel-heading"><div><span className="eyebrow">HERO ROSTER</span><h2>Students <b>{props.allStudents.length}</b></h2></div><button className="primary-button" onClick={props.onAdd}><UserPlus size={17} /> Add Student</button></div>
+        <div className="panel-heading"><div><span className="eyebrow">HERO ROSTER</span><h2>Students <b>{props.allStudents.length}</b></h2></div><div className="roster-actions"><button className="outline-button" onClick={props.onRandom} disabled={!props.allStudents.length}><Dice5 size={17} /> Random Student</button><button className="primary-button" onClick={props.onAdd}><UserPlus size={17} /> Add Student</button></div></div>
         <Filters search={props.search} setSearch={props.setSearch} sortBy={props.sortBy} setSortBy={props.setSortBy} />
         <div className="students-grid">{props.students.map((student) => <StudentCard key={student.id} student={student} theme={props.theme} onPoint={props.onPoint} onHistory={props.onHistory} onEdit={props.onEdit} />)}{!props.students.length && <EmptyState onAdd={props.onAdd} />}</div>
       </div>
@@ -291,8 +303,8 @@ function Leaderboard({ students, theme }: { students: Student[]; theme: ThemeId 
   return <aside className="leaderboard panel"><div className="panel-heading"><div><span className="eyebrow">LIVE RANKING</span><h2>{theme === "neon" ? <Trophy size={21} /> : <Crown size={21} />} Top Champions</h2></div><span className="live-dot">LIVE</span></div><div className="podium-art" aria-hidden="true"><span>✦</span><Trophy /><i>✧</i></div><div className="ranking-list">{students.map((student, index) => <div className={`rank-row rank-${index + 1}`} key={student.id}><b>{index + 1}</b><Avatar student={student} theme={theme} /><div><strong>{student.name}</strong><span>{getLevel(student.points, theme).name}</span></div><em>{student.points}<small> pts</small></em></div>)}{!students.length && <p className="empty-copy">Add students to start the leaderboard.</p>}</div><button className="outline-button"><BarChart3 size={16} /> View full leaderboard</button></aside>;
 }
 
-function ClassesView(props: { students: Student[]; theme: ThemeId; search: string; setSearch: (v: string) => void; sortBy: SortBy; setSortBy: (v: SortBy) => void; onPoint: (s: Student, t: "positive" | "negative") => void; onHistory: (s: Student) => void; onEdit: (s: Student) => void; onAdd: () => void }) {
-  return <section className="panel full-panel"><div className="panel-heading"><div><span className="eyebrow">CLASS MANAGEMENT</span><h2>Student roster</h2></div><button className="primary-button" onClick={props.onAdd}><UserPlus size={17} /> Add Student</button></div><Filters search={props.search} setSearch={props.setSearch} sortBy={props.sortBy} setSortBy={props.setSortBy} /><div className="students-grid wide">{props.students.map((student) => <StudentCard key={student.id} student={student} theme={props.theme} onPoint={props.onPoint} onHistory={props.onHistory} onEdit={props.onEdit} />)}{!props.students.length && <EmptyState onAdd={props.onAdd} />}</div></section>;
+function ClassesView(props: { students: Student[]; hasStudents: boolean; theme: ThemeId; search: string; setSearch: (v: string) => void; sortBy: SortBy; setSortBy: (v: SortBy) => void; onPoint: (s: Student, t: "positive" | "negative") => void; onHistory: (s: Student) => void; onEdit: (s: Student) => void; onAdd: () => void; onRandom: () => void }) {
+  return <section className="panel full-panel"><div className="panel-heading"><div><span className="eyebrow">CLASS MANAGEMENT</span><h2>Student roster</h2></div><div className="roster-actions"><button className="outline-button" onClick={props.onRandom} disabled={!props.hasStudents}><Dice5 size={17} /> Random Student</button><button className="primary-button" onClick={props.onAdd}><UserPlus size={17} /> Add Student</button></div></div><Filters search={props.search} setSearch={props.setSearch} sortBy={props.sortBy} setSortBy={props.setSortBy} /><div className="students-grid wide">{props.students.map((student) => <StudentCard key={student.id} student={student} theme={props.theme} onPoint={props.onPoint} onHistory={props.onHistory} onEdit={props.onEdit} />)}{!props.students.length && <EmptyState onAdd={props.onAdd} />}</div></section>;
 }
 
 function LevelsView({ theme, students }: { theme: ThemeId; students: Student[] }) {
@@ -335,6 +347,11 @@ function StudentModal({ mode, student, theme, onClose, onSave, onDelete }: { mod
   function readPhoto(event: ChangeEvent<HTMLInputElement>) { const file = event.target.files?.[0]; if (!file) return; const reader = new FileReader(); reader.onload = () => setPhoto(String(reader.result)); reader.readAsDataURL(file); }
   const preview: Student = student ?? { id: "preview", classId: "", name: name || "New Hero", photo, points: 0, createdAt: "" };
   return <div className="modal-layer" onMouseDown={(event) => event.target === event.currentTarget && onClose()}><form className="modal student-modal" onSubmit={(event) => { event.preventDefault(); if (name.trim()) void onSave(name.trim(), photo, student); }}><button className="modal-close" type="button" onClick={onClose}><X /></button><span className="eyebrow">{mode === "add" ? "WELCOME A NEW HERO" : "STUDENT PROFILE"}</span><h2>{mode === "add" ? "Add student" : `Edit ${student?.name}`}</h2><div className="photo-editor"><Avatar student={{ ...preview, name: name || preview.name, photo }} theme={theme} large /><div><label className="upload-button"><Camera size={16} /> {photo ? "Replace photo" : "Upload photo"}<input type="file" accept="image/*" onChange={readPhoto} /></label>{photo && <button type="button" onClick={() => setPhoto(null)}><Trash2 size={15} /> Remove photo</button>}<small>JPG, PNG or WebP. Stored in MongoDB.</small></div></div><label className="field-label">Student name<input autoFocus value={name} onChange={(event) => setName(event.target.value)} placeholder="Enter full name" required /></label><div className="modal-actions">{mode === "edit" && student && <button type="button" className="danger-button" onClick={() => void onDelete(student)}><Trash2 size={16} /> Delete student</button>}<button type="button" className="outline-button" onClick={onClose}>Cancel</button><button className="primary-button" type="submit"><UserPlus size={16} /> {mode === "add" ? "Add student" : "Save changes"}</button></div></form></div>;
+}
+
+function RandomStudentModal({ student, theme, className, onPickAgain, onClose }: { student: Student; theme: ThemeId; className: string; onPickAgain: () => void; onClose: () => void }) {
+  const level = getLevel(student.points, theme);
+  return <div className="modal-layer" onMouseDown={(event) => event.target === event.currentTarget && onClose()}><section className="modal random-student-modal" role="dialog" aria-modal="true" aria-label="Random student"><button className="modal-close" onClick={onClose}><X /></button><span className="random-dice"><Dice5 /></span><span className="eyebrow">RANDOM STUDENT · {className.toUpperCase()}</span><Avatar student={student} theme={theme} large /><h2>{student.name}</h2><p style={{ color: level.color }}>{level.icon} {level.name} · {student.points} points</p><div className="random-student-actions"><button className="outline-button" onClick={onPickAgain}><Dice5 size={17} /> Pick Again</button><button className="primary-button" onClick={onClose}>Done</button></div></section></div>;
 }
 
 function Celebration({ data, theme, onClose }: { data: NonNullable<Celebration>; theme: ThemeId; onClose: () => void }) {

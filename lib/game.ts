@@ -58,12 +58,15 @@ export const LEVELS = {
   ],
 } as const;
 
+export const POINT_AWARD = 5;
+export const POINT_DEDUCTION = -3;
+
 export const POSITIVE_REASONS = [
-  { reason: "Active participation", points: 10, icon: "Hand" },
-  { reason: "Helped a friend", points: 10, icon: "Heart" },
-  { reason: "Excellent behavior", points: 15, icon: "Sparkles" },
-  { reason: "Respect the rules", points: 15, icon: "Shield" },
-  { reason: "Other", points: 10, icon: "Plus" },
+  { reason: "Active participation", points: POINT_AWARD, icon: "Hand" },
+  { reason: "Helped a friend", points: POINT_AWARD, icon: "Heart" },
+  { reason: "Excellent behavior", points: POINT_AWARD, icon: "Sparkles" },
+  { reason: "Respect the rules", points: POINT_AWARD, icon: "Shield" },
+  { reason: "Other", points: POINT_AWARD, icon: "Plus" },
 ];
 
 export const NEGATIVE_REASONS = [
@@ -71,7 +74,7 @@ export const NEGATIVE_REASONS = [
   "Disrupting the class",
   "Disrespectful behavior",
   "Other",
-].map((reason) => ({ reason, points: -10 }));
+].map((reason) => ({ reason, points: POINT_DEDUCTION }));
 
 export function levelIndex(points: number) {
   return Math.min(6, Math.floor(Math.max(0, points) / 50));
