@@ -66,7 +66,7 @@ export const POSITIVE_REASONS = [
   { reason: "Helped a friend", points: POINT_AWARD, icon: "Heart" },
   { reason: "Excellent behavior", points: POINT_AWARD, icon: "Sparkles" },
   { reason: "Respect the rules", points: POINT_AWARD, icon: "Shield" },
-  { reason: "Other", points: POINT_AWARD, icon: "Plus" },
+  { reason: "Other", points: 5, icon: "Plus" },
 ];
 
 export const NEGATIVE_REASONS = [

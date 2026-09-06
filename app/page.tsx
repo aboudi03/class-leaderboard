@@ -53,6 +53,7 @@ export default function HomePage() {
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState<SortBy>("points");
   const [pointModal, setPointModal] = useState<PointModal>(null);
+  const [leaderboardOpen, setLeaderboardOpen] = useState(false);
   const [historyStudent, setHistoryStudent] = useState<Student | null>(null);
   const [studentModal, setStudentModal] = useState<{ mode: "add" | "edit"; student?: Student } | null>(null);
   const [randomStudent, setRandomStudent] = useState<Student | null>(null);
@@ -233,6 +234,7 @@ export default function HomePage() {
           sortBy={sortBy} setSortBy={setSortBy} onPoint={(student, type) => setPointModal({ student, type })}
           onHistory={setHistoryStudent} onEdit={(student) => setStudentModal({ mode: "edit", student })}
           onAdd={() => setStudentModal({ mode: "add" })} onRandom={pickRandomStudent} currentClass={currentClass.name}
+          onViewLeaderboard={() => setLeaderboardOpen(true)}
         />}
         {view === "classes" && <ClassesView students={visibleStudents} hasStudents={classStudents.length > 0} theme={theme} search={search} setSearch={setSearch} sortBy={sortBy} setSortBy={setSortBy} onPoint={(student, type) => setPointModal({ student, type })} onHistory={setHistoryStudent} onEdit={(student) => setStudentModal({ mode: "edit", student })} onAdd={() => setStudentModal({ mode: "add" })} onRandom={pickRandomStudent} />}
         {view === "levels" && <LevelsView theme={theme} students={classStudents} />}
@@ -242,6 +244,7 @@ export default function HomePage() {
       </section>
 
       {pointModal && <PointPicker modal={pointModal} theme={theme} onClose={() => setPointModal(null)} onChoose={(points, reason) => addPoints(pointModal.student, points, reason)} />}
+      {leaderboardOpen && <FullLeaderboardModal students={classStudents} theme={theme} className={currentClass.name} onClose={() => setLeaderboardOpen(false)} />}
       {historyStudent && <HistoryModal student={data.students.find((item) => item.id === historyStudent.id) ?? historyStudent} transactions={data.transactions} theme={theme} onClose={() => setHistoryStudent(null)} />}
       {studentModal && <StudentModal mode={studentModal.mode} student={studentModal.student} theme={theme} onClose={() => setStudentModal(null)} onSave={saveStudent} onDelete={deleteStudent} />}
       {randomStudent && <RandomStudentModal student={randomStudent} theme={theme} className={currentClass.name} onPickAgain={pickRandomStudent} onClose={() => setRandomStudent(null)} />}
@@ -258,7 +261,7 @@ function ClassSelector({ classId, onSelect, theme }: { classId: string; onSelect
 function Dashboard(props: {
   students: Student[]; allStudents: Student[]; theme: ThemeId; totalPoints: number; champions: number; average: number; topStudents: Student[];
   search: string; setSearch: (value: string) => void; sortBy: SortBy; setSortBy: (value: SortBy) => void;
-  onPoint: (student: Student, type: "positive" | "negative") => void; onHistory: (student: Student) => void; onEdit: (student: Student) => void; onAdd: () => void; onRandom: () => void; currentClass: string;
+  onPoint: (student: Student, type: "positive" | "negative") => void; onHistory: (student: Student) => void; onEdit: (student: Student) => void; onAdd: () => void; onRandom: () => void; currentClass: string; onViewLeaderboard: () => void;
 }) {
   return <>
     <section className="stats-grid">
@@ -274,7 +277,7 @@ function Dashboard(props: {
         <Filters search={props.search} setSearch={props.setSearch} sortBy={props.sortBy} setSortBy={props.setSortBy} />
         <div className="students-grid">{props.students.map((student) => <StudentCard key={student.id} student={student} theme={props.theme} onPoint={props.onPoint} onHistory={props.onHistory} onEdit={props.onEdit} />)}{!props.students.length && <EmptyState onAdd={props.onAdd} />}</div>
       </div>
-      <Leaderboard students={props.topStudents} theme={props.theme} />
+      <Leaderboard students={props.topStudents} theme={props.theme} onViewAll={props.onViewLeaderboard} />
     </section>
   </>;
 }
@@ -299,8 +302,13 @@ function StudentCard({ student, theme, onPoint, onHistory, onEdit }: { student: 
   return <article className="student-card"><div className="card-top"><Avatar student={student} theme={theme} editable onClick={() => onEdit(student)} /><div className="student-name"><h3>{student.name}</h3><span style={{ color: level.color }}>{level.icon} {level.name}</span></div><button className="history-button" onClick={() => onHistory(student)} aria-label={`Open ${student.name}'s history`}><History size={17} /></button></div><div className="points-row"><span>{theme === "neon" ? <Zap size={16} /> : <Gem size={16} />} <b>{student.points}</b> POINTS</span><small>{progress.next ? `${student.points} / ${progress.target}` : `${student.points} / 300+`}</small></div><div className="student-progress"><i style={{ width: `${progress.percent}%`, background: level.color }} /></div><p>{progress.next ? <><b>{progress.remaining} points</b> to {progress.next.name}</> : <><Trophy size={14} /> Ultimate level achieved</>}</p><div className="point-actions"><button className="add-point" onClick={() => onPoint(student, "positive")}><Plus size={18} /> POINT</button><button className="remove-point" onClick={() => onPoint(student, "negative")}><Minus size={17} /> POINT</button></div></article>;
 }
 
-function Leaderboard({ students, theme }: { students: Student[]; theme: ThemeId }) {
-  return <aside className="leaderboard panel"><div className="panel-heading"><div><span className="eyebrow">LIVE RANKING</span><h2>{theme === "neon" ? <Trophy size={21} /> : <Crown size={21} />} Top Champions</h2></div><span className="live-dot">LIVE</span></div><div className="podium-art" aria-hidden="true"><span>✦</span><Trophy /><i>✧</i></div><div className="ranking-list">{students.map((student, index) => <div className={`rank-row rank-${index + 1}`} key={student.id}><b>{index + 1}</b><Avatar student={student} theme={theme} /><div><strong>{student.name}</strong><span>{getLevel(student.points, theme).name}</span></div><em>{student.points}<small> pts</small></em></div>)}{!students.length && <p className="empty-copy">Add students to start the leaderboard.</p>}</div><button className="outline-button"><BarChart3 size={16} /> View full leaderboard</button></aside>;
+function Leaderboard({ students, theme, onViewAll }: { students: Student[]; theme: ThemeId; onViewAll: () => void }) {
+  return <aside className="leaderboard panel"><div className="panel-heading"><div><span className="eyebrow">LIVE RANKING</span><h2>{theme === "neon" ? <Trophy size={21} /> : <Crown size={21} />} Top Champions</h2></div><span className="live-dot">LIVE</span></div><div className="podium-art" aria-hidden="true"><span>✦</span><Trophy /><i>✧</i></div><div className="ranking-list">{students.map((student, index) => <div className={`rank-row rank-${index + 1}`} key={student.id}><b>{index + 1}</b><Avatar student={student} theme={theme} /><div><strong>{student.name}</strong><span>{getLevel(student.points, theme).name}</span></div><em>{student.points}<small> pts</small></em></div>)}{!students.length && <p className="empty-copy">Add students to start the leaderboard.</p>}</div><button className="outline-button" onClick={onViewAll}><BarChart3 size={16} /> View full leaderboard</button></aside>;
+}
+
+function FullLeaderboardModal({ students, theme, className, onClose }: { students: Student[]; theme: ThemeId; className: string; onClose: () => void }) {
+  const rankedStudents = [...students].sort((a, b) => b.points - a.points || a.name.localeCompare(b.name));
+  return <div className="modal-layer" onMouseDown={(event) => event.target === event.currentTarget && onClose()}><section className="modal full-leaderboard-modal" role="dialog" aria-modal="true" aria-label={`${className} full leaderboard`}><button className="modal-close" onClick={onClose}><X /></button><div className="full-leaderboard-header"><span className="eyebrow">LIVE RANKING · {className.toUpperCase()}</span><h2>{theme === "neon" ? <Trophy size={22} /> : <Crown size={22} />} Full leaderboard</h2><p>{rankedStudents.length} student{rankedStudents.length === 1 ? "" : "s"} ranked by points</p></div><div className="full-leaderboard-list">{rankedStudents.map((student, index) => <div className={`rank-row rank-${index + 1}`} key={student.id}><b>{index + 1}</b><Avatar student={student} theme={theme} /><div><strong>{student.name}</strong><span>{getLevel(student.points, theme).name}</span></div><em>{student.points}<small> pts</small></em></div>)}{!rankedStudents.length && <p className="empty-copy">Add students to start the leaderboard.</p>}</div></section></div>;
 }
 
 function ClassesView(props: { students: Student[]; hasStudents: boolean; theme: ThemeId; search: string; setSearch: (v: string) => void; sortBy: SortBy; setSortBy: (v: SortBy) => void; onPoint: (s: Student, t: "positive" | "negative") => void; onHistory: (s: Student) => void; onEdit: (s: Student) => void; onAdd: () => void; onRandom: () => void }) {
