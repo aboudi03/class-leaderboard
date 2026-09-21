@@ -59,6 +59,7 @@ export const LEVELS = {
 } as const;
 
 export const POINT_AWARD = 10;
+export const OTHER_POINT_AWARD = 5;
 export const POINT_DEDUCTION = -5;
 
 export const POSITIVE_REASONS = [
@@ -66,7 +67,7 @@ export const POSITIVE_REASONS = [
   { reason: "Helped a friend", points: POINT_AWARD, icon: "Heart" },
   { reason: "Excellent behavior", points: POINT_AWARD, icon: "Sparkles" },
   { reason: "Respect the rules", points: POINT_AWARD, icon: "Shield" },
-  { reason: "Other", points: 5, icon: "Plus" },
+  { reason: "Other", points: OTHER_POINT_AWARD, icon: "Plus" },
 ];
 
 export const NEGATIVE_REASONS = [

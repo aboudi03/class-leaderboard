@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
-import { POINT_AWARD, POINT_DEDUCTION } from "@/lib/game";
+import { OTHER_POINT_AWARD, POINT_AWARD, POINT_DEDUCTION } from "@/lib/game";
 import { serializeStudent, serializeTransaction } from "@/lib/serializers";
 import { PointTransactionModel } from "@/models/PointTransaction";
 import { StudentModel, type StudentDocument } from "@/models/Student";
@@ -16,7 +16,9 @@ export async function POST(request: Request) {
     if (!studentId || !reason || !Number.isInteger(requestedPoints) || requestedPoints === 0) {
       return NextResponse.json({ error: "Student, reason, and non-zero whole points are required." }, { status: 400 });
     }
-    const points = requestedPoints > 0 ? POINT_AWARD : POINT_DEDUCTION;
+    const points = requestedPoints > 0
+      ? reason === "Other" ? OTHER_POINT_AWARD : POINT_AWARD
+      : POINT_DEDUCTION;
 
     await connectToDatabase();
     const session = await mongoose.startSession();
